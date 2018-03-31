@@ -12,10 +12,12 @@ class App extends React.Component {
 		this.state = {
 			interval: 3000,
 			contractAddress : "0x0BD4b82ED8c855d6F2f7d60956510648Ab0d8B9B",
+			ownerWallet:"0xDBd18e5B41B25c81f4065286C788d790f7A42607",
+			userWallet:"",
 			url : "https://api.coinmarketcap.com/v1/ticker/ethereum/",
 			etherPrice: 0,
 			tokenPrice: 0,
-			acutalTokenPrice: 0,
+			actualTokenPrice: 0,
 			sellPrice: 0,
 			buyPrice: 0,
 			tokenToUsd: 30,
@@ -604,7 +606,7 @@ class App extends React.Component {
 		  	let priceToUsd = parseFloat(json[0]["price_usd"] );
 
 			this.setState({ etherPrice: priceToUsd });
-			this.setState({ acutalTokenPrice: priceToUsd/this.state.tokenToUsd});	//Pegged to actual Ether Price
+			this.setState({ actualTokenPrice: this.state.tokenToUsd/priceToUsd});	//Pegged to actual Ether Price
 			var this2 = this;
 			this.ContractInstance.buyPrice(function(error, result){
 								if(!error){					
@@ -614,7 +616,15 @@ class App extends React.Component {
 								console.error(error);
 							});
 
-
+			this.ContractInstance.balanceOf(this.state.userWallet, function(error, result){
+								if(!error){					
+									let tokens = result.c;
+									this2.setState({ tokenInAccount: tokens[0]});
+								}
+								else
+								console.error(error);
+							});
+			/*
 			this.ContractInstance.balanceOf(web3.eth.accounts[0], function(error, result){
 								if(!error){					
 									let tokens = result.c;
@@ -623,6 +633,7 @@ class App extends React.Component {
 								else
 								console.error(error);
 							});
+							*/
 		});		   	
    }
 
@@ -631,14 +642,21 @@ class App extends React.Component {
 	}	
 
 	buyToken(){
-		let exactEtherAmount = Math.floor(this.state.etherAmount/ this.state.tokenPrice) * this.state.tokenPrice; //Do not over spend ether.
-		this.setState({etherAmount: exactEtherAmount}, function(){
-			this.ContractInstance.buy({from: web3.eth.accounts[0], gas: 3000000, value: this.state.etherAmount}, function(error, result){
-				if(!error)
-				console.log(result)
-				else
-				console.error(error);
-			})
+		// let exactEtherAmount = Math.floor(this.state.etherAmount/ this.state.tokenPrice) * this.state.tokenPrice; //Do not over spend ether.
+		// this.setState({etherAmount: exactEtherAmount}, function(){
+		// 	this.ContractInstance.buy({from: web3.eth.accounts[0], gas: 3000000, value: this.state.etherAmount}, function(error, result){
+		// 		if(!error)
+		// 		console.log(result)
+		// 		else
+		// 		console.error(error);
+		// 	})
+		// });
+		let exactEtherAmount = this.state.tokenBuyAmount* this.state.actualTokenPrice;
+		web3.eth.sendTransaction({from: this.state.userWallet, to: this.state.ownerWallet, value: web3.toWei(exactEtherAmount,"ether")}, function(error, result){
+			if(!error)
+			console.log(result)
+			else
+			console.error(error);
 		});
 	}
 
@@ -665,27 +683,42 @@ class App extends React.Component {
    render(){
 	return (
 		<div>
-			<label> Client Page </label>
-			<div>
-				<label>Ether To USD: {this.state.etherPrice}</label>
-				<br></br>
-				<label>Actual Ether To Token: {this.state.acutalTokenPrice}</label>
-				<br></br>
-				<label> Contract Ether(Wei) To Token: {this.state.tokenPrice}</label>
+			<h2> Hastings Account </h2><br/>
+			<div> 
+				<span>Hasting Contract Address: {this.state.contractAddress}</span> <br/>
+				<span> Hasting Wallet Address: {this.state.ownerWallet} </span><br/>
+				<span> Number of EW Tokens (Total): 2500000 </span><br/>
+				<span> Number of EW Tokens (Left): 1500000 </span> <br/>
+				<span> Cost of EW Token (1 MAR 2018): USD {this.state.tokenToUsd} or ETH {this.state.actualTokenPrice} </span> <br/>
 			</div>
+			<hr/>			
+			<h2> My Account </h2><br/>
+			<div> 
+				<label>
+					User Wallet Address:
+					<input
+						name="userWallet"
+						type="text"
+						value={this.state.userWallet}
+						onChange={this.handleInputChange}></input>
+				</label>
+			</div>
+			<div> Number of EW Token: {this.state.tokenInAccount}</div>
+			<hr/>
 			<div>
 				<label>
-					Buy Tokens With Ether:
+					Number of Tokens to Buy:
 					<input
-						name="etherAmount"
-						type="text"
-						value={this.state.etherAmount}
+						name="tokenBuyAmount"
+						type="number"
+						step="0.01"
+						value={this.state.tokenBuyAmount}
 						onChange={this.handleInputChange}></input>
-				</label>		
-				<button onClick={this.buyToken}>Buy Token</button>
-				<br></br>
-				<label>Approximate token to receive: {(this.state.tokenBuyAmount/Math.pow(10,18)).toFixed(18)}</label>
+				</label>			
 			</div>
+			<div> Cost in USD: {this.state.tokenBuyAmount* this.state.tokenToUsd } </div>
+			<div> Cost in ETH: {this.state.tokenBuyAmount* this.state.actualTokenPrice } </div>
+			<button onClick={this.buyToken}>Buy Token</button>
 			<div>
 				<label>
 					Sell Tokens:
@@ -697,9 +730,6 @@ class App extends React.Component {
 				</label>
 				<button onClick={this.sellToken}>Sell Token</button>
 				<br></br>											
-			</div>
-			<div>
-				<label>Tokens in Account: {this.state.tokenInAccount}</label>
 			</div>
 		</div>
    	);
